@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="15"
+   height="15"
+   viewBox="0 0 15 15"
+   fill="none"
+   version="1.1"
+   id="svg1"
+   sodipodi:docname="icone_antihorario.svg"
+   inkscape:version="1.3.2 (091e20e, 2023-11-25, custom)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="82.333333"
+     inkscape:cx="7.4939271"
+     inkscape:cy="7.5"
+     inkscape:window-width="2560"
+     inkscape:window-height="1494"
+     inkscape:window-x="-11"
+     inkscape:window-y="-11"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg1" />
+  <path
+     fill-rule="evenodd"
+     clip-rule="evenodd"
+     d="M4.24805 7.5C4.24805 9.29493 5.70312 10.75 7.49805 10.75C9.29297 10.75 10.748 9.29493 10.748 7.5C10.748 5.70508 9.29297 4.25 7.49805 4.25C6.29557 4.25 5.24489 4.9032 4.68272 5.875H5.87305V6.6875H3.43555V4.25L4.24805 4.25V5.06225C4.98902 4.07591 6.16868 3.4375 7.49805 3.4375C9.74171 3.4375 11.5605 5.25634 11.5605 7.5C11.5605 9.74366 9.7417 11.5625 7.49805 11.5625C5.25439 11.5625 3.43555 9.74366 3.43555 7.5H4.24805Z"
+     fill="black"
+     id="path1" />
+</svg>

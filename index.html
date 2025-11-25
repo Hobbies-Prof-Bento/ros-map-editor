@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Editor de Imagem (Simples)</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="toolbar">
+    <div class="group">
+      <label class="btn">
+        Carregar imagem
+        <input id="fileInput" type="file" accept="image/png,image/jpeg" hidden>
+      </label>
+      <span id="imgInfo" class="info"></span>
+      <label class="btn" for="areasYamlFile">Importar Prohibition Areas</label>
+      <input id="areasYamlFile" type="file" accept=".yaml,.yml" hidden>
+    </div>
+
+    <div class="group tools-radio">
+      <label><input type="radio" name="tool" value="pan" id="toolPan" checked> Pan</label>
+      <label><input type="radio" name="tool" value="brush" id="toolBrush"> Pincel</label>
+      <label><input type="radio" name="tool" value="eraser" id="toolEraser"> Borracha</label>
+      <label><input type="radio" name="tool" value="line" id="toolLine"> Linha</label>
+      <label><input type="radio" name="tool" value="rect" id="toolRect"> Retângulo</label>
+    </div>
+
+    <div class="group brush-controls">
+      <input id="color" type="color" value="#ff0000" title="Cor">
+      <input id="sizeRange" type="range" min="1" max="120" step="1" value="8" title="Tamanho">
+      <span id="sizeVal" class="info">8 px</span>
+    </div>
+
+    <div class="group undo-group">
+      <button id="undoBtn" class="btn">Desfazer</button>
+      <button id="redoBtn" class="btn">Refazer</button>
+      <button id="clearBtn" class="btn">Reset</button>
+    </div>
+
+    <div class="group">
+      <button id="rotL" class="btn" title="Girar 90° anti-horário">⟲</button>
+      <button id="rotR" class="btn" title="Girar 90° horário">⟳</button>
+      <button id="flipH" class="btn" title="Espelhar horizontal">⇋</button>
+      <button id="flipV" class="btn" title="Espelhar vertical">⇵</button>
+    </div>
+
+    <div class="group">
+      <label>Passo rotação (°)
+        <input id="rotStep" type="number" min="1" max="180" value="5" class="num">
+      </label>
+    </div>
+
+    
+
+    <div class="group">
+      <label><input id="gridToggle" type="checkbox"> Grade</label>
+      <label>Cel: <input id="gridSize" type="number" min="5" max="1000" value="50" class="num"></label>
+      <input id="gridColor" type="color" value="#00ff00" title="Cor da grade">
+      <label>α <input id="gridAlpha" type="range" min="0" max="1" step="0.05" value="0.3"></label>
+    </div>
+
+    <div class="group">
+      <label>Zoom <input id="zoomRange" type="range" min="0.1" max="4" step="0.05" value="1"></label>
+      <span id="zoomVal" class="info">100%</span>
+    </div>
+
+    <div class="group">
+      <label><input id="areasToggle" type="checkbox" checked> Exibir áreas importadas</label>
+    </div>
+
+    <div class="group">
+      <label><input id="exportProhibitions" type="checkbox"> Incluir áreas de proibição na imagem (preto)</label>
+    </div>
+
+    <div class="group">
+      <button id="savePng" class="btn">Exportar PNG</button>
+      <button id="saveJpeg" class="btn">Exportar JPEG</button>
+      <button id="saveYaml" class="btn">Exportar Prohibition Areas</button>
+      <a id="downloadLink" download hidden></a>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <div id="canvasWrapper" class="canvas-wrapper">
+      <canvas id="canvas"></canvas>
+      <canvas id="gridCanvas" class="overlay" aria-hidden="true"></canvas>
+      <canvas id="hudCanvas" class="overlay" aria-hidden="true"></canvas>
+    </div>
+  </main>
+
+  <!-- Caixa de ferramentas vertical -->
+  <nav class="toolbox" aria-label="Ferramentas">
+    <div class="quick-controls" aria-label="Controles rápidos">
+      <button id="zoomInBtn"   class="qc-btn qc-top qc-wide"   title="Mais zoom">
+        <img src="./icons/icone_zoomin.svg" alt="+"/>
+      </button>
+      <button id="rotLeftBtn2"  class="qc-btn qc-left"  title="Rotacionar anti-horário">
+        <img src="./icons/icone_antihorario.svg" alt="↺"/>
+      </button>
+      <button id="rotRightBtn2" class="qc-btn qc-right" title="Rotacionar horário">
+        <img src="./icons/icone_horario.svg" alt="↻"/>
+      </button>
+      <button id="zoomOutBtn"  class="qc-btn qc-bottom qc-wide" title="Menos zoom">
+        <img src="./icons/icone_zoomout.svg" alt="-"/>
+      </button>
+    </div>
+    <button id="toolPanBtn" class="tool-btn" title="Pan (mover)"><img src="./icons/icone_hand.svg" alt="Pan"/></button>
+    <button id="toolBrushBtn" class="tool-btn" title="Pincel"><img src="./icons/icone_pincel.svg" alt="Pincel"/></button>
+    <button id="toolLineBtn" class="tool-btn" title="Linha"><img src="./icons/icone_linha.svg" alt="Linha"/></button>
+    <button id="toolRectBtn" class="tool-btn" title="Retângulo"><img src="./icons/icone_retangulo.svg" alt="Retângulo"/></button>
+    <button id="toolEraserBtn" class="tool-btn" title="Borracha"><img src="./icons/icone_borracha.svg" alt="Borracha"/></button>
+    <button id="toolUndoBtn" class="tool-btn" title="Desfazer"><img src="./icons/icone_desfazer.svg" alt="Undo"/></button>
+    <button id="toolRedoBtn" class="tool-btn" title="Refazer"><img src="./icons/icone_refazer.svg" alt="Redo"/></button>
+  </nav>
+
+  <section class="help">
+    <strong>Uso:</strong> carregue JPG/PNG, desenhe com pincel ou borracha, ajuste zoom, e exporte mantendo a resolução original.
+  </section>
+
+  <script src="./app.js"></script>
+</body>
+</html>

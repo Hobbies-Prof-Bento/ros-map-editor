@@ -1,0 +1,99 @@
+*{box-sizing:border-box}
+:root{
+  --bg:#0e0f12;
+  --panel:#1b1f26;
+  --accent:#1e90ff;
+  --text:#e8e8e8;
+  --muted:#9aa4ad;
+  --btn:#2a3140;
+  --btn-hover:#374153;
+  --danger:#e55353;
+  --qc-size:38px;
+  --qc-gap:4px;
+}
+html,body{height:100%}
+body{
+  margin:0; padding:0; background:var(--bg); color:var(--text);
+  font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji","Segoe UI Emoji";
+}
+
+.toolbar{
+  position:sticky; top:0; z-index:10;
+  display:flex; flex-wrap:wrap; gap:.75rem; align-items:center;
+  padding:.75rem; background:var(--panel); border-bottom:1px solid #222933;
+}
+.toolbar .group{ display:flex; align-items:center; gap:.5rem; }
+.toolbar label{ display:flex; align-items:center; gap:.35rem; }
+.toolbar .btn{
+  background:var(--btn); color:var(--text); border:1px solid #303845; border-radius:.5rem;
+  padding:.45rem .7rem; cursor:pointer; transition:.15s background;
+}
+.toolbar .btn:hover{ background:var(--btn-hover); }
+.toolbar .info{ color:var(--muted); font-size:.9rem; }
+.toolbar .num{ width:5.5rem; padding:.25rem .4rem; background:#12161c; color:var(--text); border:1px solid #303845; border-radius:.35rem; }
+
+.workspace{ height: calc(100vh - 72px); overflow:auto; display:flex; align-items:flex-start; justify-content:center; padding:1rem; }
+.workspace.grab { cursor: grab; }
+.workspace.grabbing { cursor: grabbing; }
+.canvas-wrapper{
+  position:relative; background:#0b0d11; border:1px dashed #2a3441; border-radius:.5rem; box-shadow: 0 0 0 4px rgba(0,0,0,.25) inset;
+}
+.canvas-wrapper canvas{ display:block; }
+#canvas{ position:absolute; top:0; left:0; image-rendering: pixelated; z-index:1; }
+#gridCanvas{ position:absolute; top:0; left:0; pointer-events:none; z-index:2; }
+#hudCanvas{ position:absolute; top:0; left:0; pointer-events:none; z-index:3; }
+.overlay{ position:absolute; top:0; left:0; pointer-events:none; }
+
+.help{ padding: .75rem 1rem; color:var(--muted); border-top:1px solid #222933; }
+
+input[type="range"]{ accent-color:var(--accent); }
+input[type="color"]{ border:1px solid #303845; background:#12161c; height:28px; width:36px; border-radius:.35rem; padding:0; }
+
+/* Cursor brush preview (optional minimal) */
+.canvas-wrapper.drawing { cursor: crosshair; }
+
+/* Hide legacy radio tool group (we use icon toolbox) */
+.tools-radio { display:none; }
+.zoom-group { display:none; }
+
+/* Quick controls (dentro da toolbox, sem sobreposição) */
+.quick-controls{
+  position: static; z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(2, var(--qc-size));
+  grid-auto-rows: var(--qc-size);
+  gap: var(--qc-gap);
+  justify-items: center;
+  pointer-events: none; /* apenas os botões capturam eventos */
+  margin-bottom: 8px;
+}
+.qc-btn{
+  position: relative; width:var(--qc-size); height:var(--qc-size);
+  display:grid; place-items:center;
+  background: rgba(255,255,255,0.9); border:1px solid #d2d6dc; border-radius:.6rem;
+  box-shadow: 0 8px 18px rgba(0,0,0,.20);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  pointer-events: auto; /* botões seguem clicáveis */
+}
+.qc-btn:hover{ background:#fff; }
+.qc-btn img{ width:20px; height:20px; }
+.qc-wide{ grid-column: 1 / span 2; }
+
+/* Vertical toolbox (right center) */
+.toolbox{
+  position: fixed; right: 16px; top: 50%; transform: translateY(-50%);
+  z-index: 20; display:flex; flex-direction:column; gap:12px; align-items:center;
+  background: rgba(120,120,120,0.45);
+  border: 1px solid rgba(0,0,0,.15); border-radius:14px; padding:12px 10px;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 10px 28px rgba(0,0,0,.35);
+}
+.tool-btn{
+  width:46px; height:46px; display:grid; place-items:center;
+  background: rgba(255,255,255,0.9); border:1px solid #d2d6dc; border-radius:.6rem;
+  box-shadow: 0 8px 20px rgba(0,0,0,.25);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.tool-btn img{ width:24px; height:24px; }
+.tool-btn:hover{ background:#fff; }
+.tool-btn.active{ outline:2px solid #e55353; outline-offset:0; }
