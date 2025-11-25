@@ -11,7 +11,7 @@
     <div class="group">
       <label class="btn">
         Carregar imagem
-        <input id="fileInput" type="file" accept="image/png,image/jpeg" hidden>
+        <input id="fileInput" type="file" accept="image/png,image/jpeg,image/x-portable-graymap,.pgm" hidden>
       </label>
       <span id="imgInfo" class="info"></span>
       <label class="btn" for="areasYamlFile">Importar Prohibition Areas</label>
@@ -76,6 +76,7 @@
     <div class="group">
       <button id="savePng" class="btn">Exportar PNG</button>
       <button id="saveJpeg" class="btn">Exportar JPEG</button>
+      <button id="savePgm" class="btn">Exportar PGM</button>
       <button id="saveYaml" class="btn">Exportar Prohibition Areas</button>
       <a id="downloadLink" download hidden></a>
     </div>

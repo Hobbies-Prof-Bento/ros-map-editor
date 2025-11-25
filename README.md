@@ -2,6 +2,11 @@
 
 Editor web simples (HTML/CSS/JS puros) para revisar e editar mapas, desenhar Prohibition Areas e exportar imagem e YAML mantendo a resolução original.
 
+## Demonstração
+- Vídeo (YouTube): https://youtu.be/cCq1yT_o2wM
+
+![Editor de Imagem de Mapas](./img/screenshot.png)
+
 ## Principais recursos
 - Rotação somente visual do mapa (ferramentas continuam funcionais).
 - Zoom e pan suaves.

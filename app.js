@@ -37,6 +37,7 @@
 
   const savePng = document.getElementById('savePng');
   const saveJpeg = document.getElementById('saveJpeg');
+  const savePgm = document.getElementById('savePgm');
   const saveYaml = document.getElementById('saveYaml');
   const importMapYaml = document.getElementById('importMapYaml');
   const mapYamlFile = document.getElementById('mapYamlFile');
@@ -762,15 +763,74 @@
     updateZeroPixel();
   }
 
+  function parsePGM(buffer){
+    const u8 = new Uint8Array(buffer);
+    let p = 0;
+    const isWs = (c)=> c===9||c===10||c===13||c===32;
+    function skipWs(){
+      while(p<u8.length){ if(u8[p]===35){ while(p<u8.length && u8[p]!==10) p++; } else if(isWs(u8[p])){ p++; } else break; }
+    }
+    function readToken(){
+      skipWs();
+      let s = '';
+      while(p<u8.length && !isWs(u8[p]) && u8[p]!==35){ s += String.fromCharCode(u8[p++]); }
+      return s;
+    }
+    const magic = readToken();
+    if(magic!=='P5' && magic!=='P2') throw new Error('not pgm');
+    const w = parseInt(readToken(),10);
+    const h = parseInt(readToken(),10);
+    const maxv = parseInt(readToken(),10);
+    if(!isFinite(w)||!isFinite(h)||!isFinite(maxv)||w<=0||h<=0) throw new Error('bad header');
+    const gray = new Uint8Array(w*h);
+    if(magic==='P5'){
+      if(isWs(u8[p])) p++;
+      if(maxv<=255){
+        for(let i=0;i<w*h && p<u8.length;i++,p++) gray[i] = u8[p];
+      } else {
+        for(let i=0;i<w*h && p+1<u8.length;i++,p+=2){ const v = (u8[p]<<8)|u8[p+1]; gray[i] = Math.max(0,Math.min(255, Math.round(v/257))); }
+      }
+    } else {
+      for(let i=0;i<w*h;i++){ const t = readToken(); if(!t) break; const v = parseFloat(t); const g = Math.round((v/maxv)*255); gray[i] = Math.max(0,Math.min(255,g)); }
+    }
+    return { width:w, height:h, gray };
+  }
+
+  function loadFromPGM(pgm){
+    const w = pgm.width, h = pgm.height;
+    originalWidth = w; originalHeight = h;
+    setAllDims(w,h);
+    const imgData = baseCtx.createImageData(w,h);
+    const d = imgData.data;
+    const g = pgm.gray;
+    for(let i=0,j=0;i<g.length;i++,j+=4){ const v = g[i]; d[j]=v; d[j+1]=v; d[j+2]=v; d[j+3]=255; }
+    baseCtx.putImageData(imgData,0,0);
+    drawCtx.clearRect(0,0,w,h);
+    imageLoaded = true;
+    resetStacks();
+    applyZoom(parseFloat(zoomRange.value));
+    updateInfo();
+    render();
+    drawGrid();
+    updateZeroPixel();
+  }
+
   fileInput.addEventListener('change', ()=>{
     const f = fileInput.files && fileInput.files[0];
     if(!f) return;
-    const url = URL.createObjectURL(f);
-    const img = new Image();
-    img.decode ? img.decode().catch(()=>{}) : null;
-    img.onload = ()=>{ loadFromImage(img); URL.revokeObjectURL(url); };
-    img.onerror = ()=>{ URL.revokeObjectURL(url); };
-    img.src = url;
+    const name = (f.name||'').toLowerCase();
+    if(name.endsWith('.pgm')){
+      const reader = new FileReader();
+      reader.onload = ()=>{ try{ const pgm = parsePGM(reader.result); loadFromPGM(pgm); }catch(e){} };
+      reader.readAsArrayBuffer(f);
+    } else {
+      const url = URL.createObjectURL(f);
+      const img = new Image();
+      img.decode ? img.decode().catch(()=>{}) : null;
+      img.onload = ()=>{ loadFromImage(img); URL.revokeObjectURL(url); };
+      img.onerror = ()=>{ URL.revokeObjectURL(url); };
+      img.src = url;
+    }
   });
 
   function rotateCanvas90(srcCanvas, dir){
@@ -1058,6 +1118,68 @@
     const data = exportComposite('jpeg', 1);
     if(data) triggerDownload(data, 'image-edited.jpg');
   });
+
+  function exportCompositePgmBlob(){
+    if(!imageLoaded) return null;
+    const compW = baseCanvas.width, compH = baseCanvas.height;
+    const comp = document.createElement('canvas');
+    comp.width = compW; comp.height = compH;
+    const cctx = comp.getContext('2d');
+    cctx.imageSmoothingEnabled = false;
+    cctx.drawImage(baseCanvas, 0, 0);
+    const includeOverlay = !!(exportProhibitions && exportProhibitions.checked);
+    if(includeOverlay){
+      const tmp = document.createElement('canvas');
+      tmp.width = drawCanvas.width; tmp.height = drawCanvas.height;
+      const tctx = tmp.getContext('2d');
+      tctx.drawImage(drawCanvas, 0, 0);
+      try{
+        const img = tctx.getImageData(0,0,tmp.width,tmp.height);
+        const data = img.data;
+        for(let i=0;i<data.length;i+=4){ const a = data[i+3]; if(a!==0){ data[i]=0; data[i+1]=0; data[i+2]=0; } }
+        tctx.putImageData(img,0,0);
+      }catch(e){}
+      cctx.drawImage(tmp, 0, 0);
+    } else {
+      const tmp = document.createElement('canvas');
+      tmp.width = drawCanvas.width; tmp.height = drawCanvas.height;
+      const tctx = tmp.getContext('2d');
+      tctx.drawImage(drawCanvas, 0, 0);
+      try{
+        const img = tctx.getImageData(0,0,tmp.width,tmp.height);
+        const data = img.data;
+        for(let i=0;i<data.length;i+=4){ const r=data[i], g=data[i+1], b=data[i+2], a=data[i+3]; if(a!==0 && r>=200 && g<=50 && b<=50){ data[i+3]=0; } }
+        tctx.putImageData(img,0,0);
+      }catch(e){}
+      cctx.drawImage(tmp, 0, 0);
+    }
+    const out = document.createElement('canvas');
+    out.width = originalWidth; out.height = originalHeight;
+    const octx = out.getContext('2d');
+    octx.imageSmoothingEnabled = false;
+    octx.fillStyle = '#cdcdcd';
+    octx.fillRect(0,0,out.width,out.height);
+    const dx = Math.round((originalWidth - compW)/2);
+    const dy = Math.round((originalHeight - compH)/2);
+    octx.drawImage(comp, dx, dy);
+    const img = octx.getImageData(0,0,out.width,out.height);
+    const data = img.data;
+    const gray = new Uint8Array(out.width*out.height);
+    for(let i=0,j=0;i<gray.length;i++,j+=4){ gray[i] = Math.max(0,Math.min(255, Math.round(0.299*data[j] + 0.587*data[j+1] + 0.114*data[j+2]))); }
+    const enc = new TextEncoder();
+    const head = enc.encode(`P5\n${out.width} ${out.height}\n255\n`);
+    return new Blob([head, gray], { type: 'image/x-portable-graymap' });
+  }
+
+  if(savePgm){
+    savePgm.addEventListener('click', ()=>{
+      const blob = exportCompositePgmBlob();
+      if(!blob) return;
+      const url = URL.createObjectURL(blob);
+      triggerDownload(url, 'image-edited.pgm');
+      setTimeout(()=> URL.revokeObjectURL(url), 1000);
+    });
+  }
 
   // Init
   applyZoom(parseFloat(zoomRange.value));
