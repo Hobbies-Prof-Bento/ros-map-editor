@@ -44,6 +44,8 @@
   const importAreasYaml = document.getElementById('importAreasYaml');
   const areasYamlFile = document.getElementById('areasYamlFile');
   const areasToggle = document.getElementById('areasToggle');
+  const pointsJsonFile = document.getElementById('pointsJsonFile');
+  const pointsToggle = document.getElementById('pointsToggle');
   const centerOriginBtn = document.getElementById('centerOrigin');
   const downloadLink = document.getElementById('downloadLink');
 
@@ -102,6 +104,12 @@
   let startPixel = null;
   let importedAreasWorld = [];
   let importedAreasPx = [];
+  let importedPointsWorld = [];
+  let importedPointsPx = [];
+  let selectedAreaIndex = -1;
+  let isDraggingArea = false;
+  let dragStartMap = null;
+  let areaOriginalWorld = null;
 
   sizeRange.addEventListener('input', ()=>{
     brushSize = parseInt(sizeRange.value, 10) || 1;
@@ -127,6 +135,54 @@
     if(b) b.classList.add('active');
   }
 
+  function ptSegDist(px, py, x1, y1, x2, y2){
+    const vx = x2 - x1, vy = y2 - y1;
+    const wx = px - x1, wy = py - y1;
+    const len2 = vx*vx + vy*vy;
+    let t = 0;
+    if(len2 > 1e-6){ t = (wx*vx + wy*vy) / len2; }
+    if(t < 0) t = 0; else if(t > 1) t = 1;
+    const cx = x1 + t*vx;
+    const cy = y1 + t*vy;
+    return Math.hypot(px - cx, py - cy);
+  }
+  function hitTestImportedAreaAt(x, y){
+    if(!areasToggle || !areasToggle.checked) return -1;
+    if(!importedAreasPx || importedAreasPx.length===0) return -1;
+    let best = -1; let bestDist = Infinity;
+    const thr = 8;
+    for(let idx=0; idx<importedAreasPx.length; idx++){
+      const pts = importedAreasPx[idx];
+      if(!pts || pts.length<2) continue;
+      for(let i=0;i<pts.length-1;i++){
+        const d = ptSegDist(x,y, pts[i].x, pts[i].y, pts[i+1].x, pts[i+1].y);
+        if(d < bestDist){ bestDist = d; best = idx; }
+      }
+      if(pts.length>2){
+        const a = pts[pts.length-1], b = pts[0];
+        const d = ptSegDist(x,y, a.x, a.y, b.x, b.y);
+        if(d < bestDist){ bestDist = d; best = idx; }
+      }
+    }
+    return (bestDist <= thr) ? best : -1;
+  }
+
+  function parsePointsJson(text){
+    try{
+      const obj = JSON.parse(String(text||''));
+      const arr = Array.isArray(obj?.points) ? obj.points : [];
+      const out = [];
+      arr.forEach(it=>{
+        const name = String(it.dbname ?? it.name ?? '').trim();
+        const x = parseFloat(it.dbx ?? it.x);
+        const y = parseFloat(it.dby ?? it.y);
+        const yawDeg = parseFloat(it.dborientation ?? it.yaw ?? it.theta ?? 0);
+        if(Number.isFinite(x) && Number.isFinite(y)) out.push({ name, x, y, yawDeg });
+      });
+      return out;
+    }catch(e){ return []; }
+  }
+
   function parseAreasYaml(text){
     const lines = String(text||'').split(/\r?\n/);
     const items = [];
@@ -150,6 +206,17 @@
     importedAreasPx = importedAreasWorld.map(arr=> arr.map(p=> mapToPixel(p.x, p.y, mapMeta)));
   }
 
+  function updateImportedPointsPixels(){
+    if(!mapMeta || !imageLoaded){ importedPointsPx = []; return; }
+    const len = 1;
+    importedPointsPx = importedPointsWorld.map(p=>{
+      const a = (p.yawDeg||0) * Math.PI/180;
+      const p0 = mapToPixel(p.x, p.y, mapMeta);
+      const p1 = mapToPixel(p.x + Math.cos(a)*len, p.y + Math.sin(a)*len, mapMeta);
+      return { name: p.name, p0, p1 };
+    });
+  }
+
   function drawImportedAreas(){
     if(!areasToggle || !areasToggle.checked) return;
     if(!importedAreasPx || importedAreasPx.length===0) return;
@@ -164,7 +231,10 @@
     hudCtx.lineWidth = 2;
     hudCtx.strokeStyle = '#ff0000';
     hudCtx.setLineDash([6,4]);
-    importedAreasPx.forEach(pts=>{
+    importedAreasPx.forEach((pts, idx)=>{
+      const sel = (idx === selectedAreaIndex);
+      hudCtx.lineWidth = sel ? 3 : 2;
+      hudCtx.strokeStyle = sel ? '#00ccff' : '#ff0000';
       if(pts.length===2){
         hudCtx.beginPath();
         hudCtx.moveTo(pts[0].x, pts[0].y);
@@ -179,6 +249,57 @@
       }
     });
     hudCtx.setLineDash([]);
+    hudCtx.restore();
+  }
+
+  function drawImportedPoints(){
+    if(!pointsToggle || !pointsToggle.checked) return;
+    if(!importedPointsPx || importedPointsPx.length===0) return;
+    const cx = canvas.width/2, cy = canvas.height/2;
+    const theta = viewAngleDeg * Math.PI/180;
+    hudCtx.save();
+    if(Math.abs(theta) > 0.0001){
+      hudCtx.translate(cx, cy);
+      hudCtx.rotate(theta);
+      hudCtx.translate(-cx, -cy);
+    }
+    importedPointsPx.forEach(it=>{
+      const x0 = it.p0.x, y0 = it.p0.y;
+      const x1 = it.p1.x, y1 = it.p1.y;
+      hudCtx.strokeStyle = '#0000ff';
+      hudCtx.fillStyle = '#0000ff';
+      hudCtx.lineWidth = 2;
+      hudCtx.beginPath();
+      hudCtx.arc(x0, y0, 4, 0, Math.PI*2);
+      hudCtx.fill();
+      hudCtx.beginPath();
+      hudCtx.moveTo(x0, y0);
+      hudCtx.lineTo(x1, y1);
+      hudCtx.stroke();
+      const vx = x1 - x0, vy = y1 - y0;
+      const L = Math.hypot(vx, vy) || 1;
+      const ux = vx / L, uy = vy / L;
+      const ah = 8;
+      const ang = Math.PI/6;
+      const rx = ux*Math.cos(ang) - uy*Math.sin(ang);
+      const ry = ux*Math.sin(ang) + uy*Math.cos(ang);
+      const lx = ux*Math.cos(-ang) - uy*Math.sin(-ang);
+      const ly = ux*Math.sin(-ang) + uy*Math.cos(-ang);
+      hudCtx.beginPath();
+      hudCtx.moveTo(x1, y1);
+      hudCtx.lineTo(x1 - rx*ah, y1 - ry*ah);
+      hudCtx.moveTo(x1, y1);
+      hudCtx.lineTo(x1 - lx*ah, y1 - ly*ah);
+      hudCtx.stroke();
+      if(it.name){
+        hudCtx.font = '12px system-ui';
+        hudCtx.strokeStyle = 'rgba(255,255,255,0.95)';
+        hudCtx.lineWidth = 3;
+        hudCtx.strokeText(it.name, x0 + 6, y0 - 6);
+        hudCtx.fillStyle = '#000000';
+        hudCtx.fillText(it.name, x0 + 6, y0 - 6);
+      }
+    });
     hudCtx.restore();
   }
 
@@ -444,12 +565,12 @@
     hudClear();
     if(!imageLoaded) return;
     drawImportedAreas();
+    drawImportedPoints();
     if(isDrawing && (currentTool === 'line' || currentTool === 'rect') && shapeStart && lastHover.valid){
       drawShapePreview(shapeStart.x, shapeStart.y, lastHover.x, lastHover.y, false);
     } else if(currentTool === 'brush' || currentTool === 'eraser'){
       drawBrushCursor();
     }
-    drawOriginMarker();
     drawWorldCoordinates();
   }
 
@@ -457,7 +578,6 @@
   gridSize.addEventListener('input', drawGrid);
   gridColor.addEventListener('input', drawGrid);
   gridAlpha.addEventListener('input', drawGrid);
-  if(originToggle) originToggle.addEventListener('change', ()=>{ render(); });
 
   function render(){
     if(!imageLoaded) { viewCtx.clearRect(0,0,canvas.width, canvas.height); hudClear(); return; }
@@ -603,6 +723,21 @@
 
   canvas.addEventListener('pointerdown', (e)=>{
     if(!imageLoaded) return;
+    const {x,y} = clientToImageCoords(e);
+    const hitIdx = hitTestImportedAreaAt(x,y);
+    if(hitIdx >= 0){
+      canvas.setPointerCapture(e.pointerId);
+      activePointerId = e.pointerId;
+      selectedAreaIndex = hitIdx;
+      isDraggingArea = true;
+      dragStartMap = pixelToMap(x, y, mapMeta);
+      const src = importedAreasWorld[hitIdx] || [];
+      areaOriginalWorld = src.map(p=>({ x: p.x, y: p.y }));
+      render();
+      return;
+    } else {
+      if(selectedAreaIndex !== -1){ selectedAreaIndex = -1; render(); }
+    }
     if(currentTool === 'pan'){
       canvas.setPointerCapture(e.pointerId);
       activePointerId = e.pointerId;
@@ -614,7 +749,6 @@
     }
     canvas.setPointerCapture(e.pointerId);
     activePointerId = e.pointerId;
-    const {x,y} = clientToImageCoords(e);
     if(currentTool === 'brush' || currentTool === 'eraser'){
       snapshotForUndo();
       beginStroke(x,y);
@@ -627,6 +761,19 @@
 
   canvas.addEventListener('pointermove', (e)=>{
     if(!imageLoaded) return;
+    if(isDraggingArea && e.pointerId === activePointerId){
+      const {x,y} = clientToImageCoords(e);
+      const cur = pixelToMap(x, y, mapMeta);
+      const dx = cur.x - (dragStartMap ? dragStartMap.x : 0);
+      const dy = cur.y - (dragStartMap ? dragStartMap.y : 0);
+      if(selectedAreaIndex >= 0 && areaOriginalWorld){
+        const moved = areaOriginalWorld.map(p=>({ x: p.x + dx, y: p.y + dy }));
+        importedAreasWorld[selectedAreaIndex] = moved;
+        updateImportedAreasPixels();
+        render();
+      }
+      return;
+    }
     if(currentTool === 'pan' && isPanning && e.pointerId === activePointerId){
       const dx = e.clientX - panStartX;
       const dy = e.clientY - panStartY;
@@ -659,6 +806,13 @@
 
   canvas.addEventListener('pointerup', (e)=>{
     if(e.pointerId === activePointerId){
+      if(isDraggingArea){
+        isDraggingArea = false;
+        dragStartMap = null;
+        areaOriginalWorld = null;
+        cancelStroke();
+        return;
+      }
       if(currentTool === 'pan'){
         cancelStroke();
         return;
@@ -736,8 +890,22 @@
       }
     }
   });
-  canvas.addEventListener('pointercancel', (e)=>{ if(e.pointerId === activePointerId){ shapeStart = null; isDrawing = false; hudClear(); cancelStroke(); }});
-  canvas.addEventListener('pointerleave', (e)=>{ if(e.pointerId === activePointerId){ if(currentTool==='brush'||currentTool==='eraser'){ endStroke(); } shapeStart = null; isDrawing = false; hudClear(); cancelStroke(); }});
+  canvas.addEventListener('pointercancel', (e)=>{ if(e.pointerId === activePointerId){ isDraggingArea = false; dragStartMap = null; areaOriginalWorld = null; shapeStart = null; isDrawing = false; hudClear(); cancelStroke(); }});
+  canvas.addEventListener('pointerleave', (e)=>{ if(e.pointerId === activePointerId){ if(currentTool==='brush'||currentTool==='eraser'){ endStroke(); } isDraggingArea = false; dragStartMap = null; areaOriginalWorld = null; shapeStart = null; isDrawing = false; hudClear(); cancelStroke(); }});
+
+  window.addEventListener('keydown', (e)=>{
+    const tag = (e.target && e.target.tagName) ? String(e.target.tagName).toUpperCase() : '';
+    if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.isComposing) return;
+    if((e.key === 'Delete' || e.key === 'Backspace') && selectedAreaIndex >= 0){
+      if(importedAreasWorld && importedAreasWorld[selectedAreaIndex]){
+        importedAreasWorld.splice(selectedAreaIndex, 1);
+        selectedAreaIndex = -1;
+        updateImportedAreasPixels();
+        render();
+        e.preventDefault();
+      }
+    }
+  });
 
   function resetStacks(){ undoStack.length = 0; redoStack.length = 0; }
 
@@ -1049,10 +1217,12 @@
         startPixel = null;
       }
       updateImportedAreasPixels();
+      updateImportedPointsPixels();
     } else {
       zeroPixel = null;
       startPixel = null;
       importedAreasPx = [];
+      importedPointsPx = [];
     }
   }
 
@@ -1061,6 +1231,25 @@
   function buildYamlFromAnnotations(ann, meta){
     let out = 'prohibition_areas:\n';
     const fmt = (v)=> Number.isFinite(v) ? v.toFixed(2) : '0.00';
+    ann.forEach(a=>{
+      const pts = a.pts.map(p=>{
+        const m = pixelToMap(p.x, p.y, meta);
+        return `[${fmt(m.x)}, ${fmt(m.y)}]`;
+      }).join(', ');
+      out += `  - [${pts}]\n`;
+    });
+    return out;
+  }
+
+  function buildYamlCombined(ann, importedWorld, meta){
+    let out = 'prohibition_areas:\n';
+    const fmt = (v)=> Number.isFinite(v) ? v.toFixed(2) : '0.00';
+    if(Array.isArray(importedWorld)){
+      importedWorld.forEach(arr=>{
+        const pts = (arr||[]).map(p=> `[${fmt(p.x)}, ${fmt(p.y)}]`).join(', ');
+        if(pts) out += `  - [${pts}]\n`;
+      });
+    }
     ann.forEach(a=>{
       const pts = a.pts.map(p=>{
         const m = pixelToMap(p.x, p.y, meta);
@@ -1081,7 +1270,7 @@
       const yaw = parseFloat(prompt('Origin yaw (rad) from map.yaml', '0') || '0');
       meta = { resolution: res, originX: ox, originY: oy, originYaw: yaw };
     }
-    const yaml = buildYamlFromAnnotations(annotations, meta);
+    const yaml = buildYamlCombined(annotations, importedAreasWorld, meta);
     const blob = new Blob([yaml], { type: 'text/yaml' });
     const url = URL.createObjectURL(blob);
     triggerDownload(url, 'prohibition_areas.yaml');
@@ -1109,6 +1298,17 @@
     });
   }
   if(areasToggle){ areasToggle.addEventListener('change', ()=>{ render(); }); }
+
+  if(pointsJsonFile){
+    pointsJsonFile.addEventListener('change', ()=>{
+      const f = pointsJsonFile.files && pointsJsonFile.files[0];
+      if(!f) return;
+      const reader = new FileReader();
+      reader.onload = ()=>{ try{ importedPointsWorld = parsePointsJson(String(reader.result||'')); updateImportedPointsPixels(); render(); }catch(e){} };
+      reader.readAsText(f);
+    });
+  }
+  if(pointsToggle){ pointsToggle.addEventListener('change', ()=>{ render(); }); }
 
   savePng.addEventListener('click', ()=>{
     const data = exportComposite('png');
